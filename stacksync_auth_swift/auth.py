@@ -18,7 +18,7 @@ class StackSyncAuth(object):
         self.logger = get_logger(conf, log_route='stacksync_auth')
 
         dbsession = scoped_session(sessionmaker())
-        engine = create_engine("postgresql://%s:%s@%s/%s", self.user, self.password, self.host, self.dbname)
+        engine = create_engine("postgresql://%s:%s@%s/%s" % (self.user, self.password, self.host, self.dbname))
         dbsession.configure(bind=engine, autoflush=False, expire_on_commit=False)
         #Base.metadata.drop_all(engine)
         #Base.metadata.create_all(engine)
