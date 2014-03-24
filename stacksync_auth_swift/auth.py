@@ -50,11 +50,11 @@ class StackSyncAuth(object):
 
         self.logger.info('StackSync Auth: authorize: path info: %s', req.path_info)
 
-        if req.path_info == '/oauth/request_token':
+        if req.path_info == '/request_token':
             response = self.__request_token(req)
-        elif req.path_info == '/oauth/access_token':
+        elif req.path_info == '/access_token':
             response = self.__access_token(req)
-        elif req.path_info == '/oauth/authorize':
+        elif req.path_info == '/authorize':
             response = self.__authorize(req)
         else:
             response = self.__protected_resource(req)
