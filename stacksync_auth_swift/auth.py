@@ -36,7 +36,8 @@ class StackSyncAuth(object):
 
         self.logger.info('StackSync Auth: __call__: %r', environ)
 
-        if environ.get('STACKSYNC_API'):
+        if environ.get('HTTP_STACKSYNC_API'):
+            self.logger.info('StackSync Auth: __call__: STACKSYNC-API ON')
             # Handle anonymous access to accounts I'm the definitive
             # auth for.
             environ['swift.authorize_override'] = True
