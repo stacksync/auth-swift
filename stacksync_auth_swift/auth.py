@@ -48,13 +48,13 @@ class StackSyncAuth(object):
 
     def authorize(self, req):
 
-        self.logger.info('StackSync Auth: authorize: split path: %r', req)
+        self.logger.info('StackSync Auth: authorize: path info: %s', req.path_info)
 
-        if self.environ['PATH_INFO'] == '/oauth/request_token':
+        if req.path_info == '/oauth/request_token':
             response = self.__request_token(req)
-        elif self.environ['PATH_INFO'] == '/oauth/access_token':
+        elif req.path_info == '/oauth/access_token':
             response = self.__access_token(req)
-        elif self.environ['PATH_INFO'] == '/oauth/authorize':
+        elif req.path_info == '/oauth/authorize':
             response = self.__authorize(req)
         else:
             response = self.__protected_resource(req)
