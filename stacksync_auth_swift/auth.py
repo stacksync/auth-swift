@@ -19,6 +19,11 @@ class StackSyncAuth(object):
 
         dbsession = scoped_session(sessionmaker())
         engine = create_engine("postgresql://%s:%s@%s/%s", self.user, self.password, self.host, self.dbname)
+
+        # Try to connect, it will raise an exception if not possible
+        connection = engine.connect()
+        connection.close()
+
         dbsession.configure(bind=engine, autoflush=False, expire_on_commit=False)
         #Base.metadata.drop_all(engine)
         #Base.metadata.create_all(engine)
