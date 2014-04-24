@@ -3,7 +3,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from stacksync_oauth.provider import AuthProvider
 from stacksync_oauth.validator import AuthValidator
 from swift.common.middleware.acl import clean_acl
-from swift.common.swob import HTTPForbidden, HTTPUnauthorized, HTTPBadRequest
+from swift.common.swob import HTTPForbidden, HTTPUnauthorized, HTTPBadRequest, HTTPOk, Response
 from swift.common.utils import get_logger
 
 
@@ -48,19 +48,44 @@ class StackSyncAuth(object):
 
     def authorize(self, req):
 
-        self.logger.info('StackSync Auth: authorize: split path: %r', req.split_path)
+        self.logger.info('StackSync Auth: authorize: split path: %r', req)
 
+        if self.environ['PATH_INFO'] == '/oauth/request_token':
+            response = self.__request_token(req)
+        elif self.environ['PATH_INFO'] == '/oauth/access_token':
+            response = self.__access_token(req)
+        elif self.environ['PATH_INFO'] == '/oauth/authorize':
+            response = self.__authorize(req)
+        else:
+            response = self.__protected_resource(req)
+
+        return response
+
+    def __request_token(self, req):
+        self.logger.info('StackSync Auth: authorize: request token request')
         h, b, s = self.provider.create_request_token_response(req.url, http_method=req.method, body=req.body,
                                                               headers=req.headers)
+        return Response(body=b, status=s, headers=h)
 
-        self.logger.info('StackSync Auth: authorize: request token: h=%s, b=%s, s=%s', h, b, s)
+    def __access_token(self, req):
+        self.logger.info('StackSync Auth: authorize: access token request')
+        credentials = {'user_id': '1'}
+        h, b, s = self.provider.create_request_token_response(req.url, http_method=req.method, body=req.body,
+                                                              headers=req.headers, credentials=credentials)
+        return Response(body=b, status=s, headers=h)
 
-        if s == 400:
-            return HTTPBadRequest(body=b, headers=h)
-        elif s == 401:
-            return HTTPUnauthorized(body=b, headers=h)
+    def __authorize(self, req):
+        self.logger.info('StackSync Auth: authorize: authorize request')
+        b = 'Authorize page'
+        return HTTPOk(body=b)
 
-        return None
+    def __protected_resource(self, req):
+        self.logger.info('StackSync Auth: authorize: protected resource request')
+        valid, _ = self.provider.validate_protected_resource_request(req.url, http_method=req.method, body=req.body,
+                                                                     headers=req.headers)
+        if valid:
+            return None
+        return HTTPUnauthorized()
 
     def denied_response(self, req):
         """Deny WSGI Response.
