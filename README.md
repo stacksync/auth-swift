@@ -24,7 +24,7 @@ SQLAlchemy is used to map Python objects to the database.
     
 #### StackSync OAuth Python library
 
-Please, refer to the [StackSync Auth project](http://example.net/) to install it.
+Please, refer to the [StackSync Auth project](https://github.com/stacksync/auth) to install it.
 
 ## Installation
 
