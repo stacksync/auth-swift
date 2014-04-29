@@ -1,13 +1,16 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from stacksync_oauth.provider import AuthProvider
 from stacksync_oauth.validator import AuthValidator
 from swift.common.middleware.acl import clean_acl
-from swift.common.swob import HTTPForbidden, HTTPUnauthorized, HTTPBadRequest, HTTPOk, Response
+from swift.common.swob import HTTPForbidden, HTTPUnauthorized, HTTPBadRequest, HTTPOk, Response, HTTPMethodNotAllowed
 from swift.common.utils import get_logger
+import jinja2
 
 
 class StackSyncAuth(object):
+
     def __init__(self, app, conf):
         self.app = app
         self.host = conf.get('psql_host', 'localhost').lower()
@@ -16,6 +19,13 @@ class StackSyncAuth(object):
         self.user = conf.get('psql_user', 'postgres')
         self.password = conf.get('psql_password', 'postgres')
         self.logger = get_logger(conf, log_route='stacksync_auth')
+        self.templates_path = conf.get('templates_path', '')
+
+        if not os.path.isdir(self.templates_path):
+            raise Exception('Templates path does not exists')
+
+        template_loader = jinja2.FileSystemLoader(searchpath=self.templates_path)
+        self.template_env = jinja2.Environment(loader=template_loader)
 
         dbsession = scoped_session(sessionmaker())
         engine = create_engine("postgresql://%s:%s@%s/%s" % (self.user, self.password, self.host, self.dbname))
@@ -76,8 +86,21 @@ class StackSyncAuth(object):
 
     def __authorize(self, req):
         self.logger.info('StackSync Auth: authorize: authorize request')
-        b = 'Authorize page'
-        return HTTPOk(body=b)
+
+        if req.method == 'GET':
+            template_file = "authorize.jinja"
+            template = self.template_env.get_template(template_file)
+            template_vars = {"application_title": "Titulo de la app",
+                             "application_descr": "Descripcion de la app.... bla bla bla..."}
+
+            body = template.render(template_vars)
+            return HTTPOk(body=body)
+
+        elif req.method == 'POST':
+            b = 'Authorize page'
+            return HTTPOk(body=b)
+        else:
+            return HTTPMethodNotAllowed()
 
     def __protected_resource(self, req):
         self.logger.info('StackSync Auth: authorize: protected resource request')

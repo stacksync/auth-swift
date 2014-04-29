@@ -1,0 +1,16 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<html>
+    <head>
+        <title>StackSync</title>
+    </head>
+    <body>
+        <p>This application has requested access to your data:</p>
+        <div>{{ application_title }}</div>
+        <div>{{ application_descr }}</div>
+
+        <form action="/oauth/authorize" method="post">
+            <input type="submit" name="action" value="Allow" />
+            <input type="submit" name="action" value="Deny" />
+        </form>
+    </body>
+</html>
