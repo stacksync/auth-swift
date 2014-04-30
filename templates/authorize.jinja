@@ -12,40 +12,45 @@
         <title>StackSync</title>
     </head>
     <body>
-        <p>This application has requested access to your data:</p>
-        <div>{{ application_title }}</div>
-        <div>{{ application_descr }}</div>
+        <div class="container">
 
-        <form role="form" action="/oauth/authorize" method="post">
-            <div class="form-group">
-                <label for="exampleInputEmail1">Email address</label>
-                <input type="email" class="form-control" id="email" placeholder="Enter email">
-            </div>
-            <div class="form-group">
-                <label for="exampleInputPassword1">Password</label>
-                <input type="password" class="form-control" id="password" placeholder="Password">
-            </div>
-            <div class="form-group">
-                <div class="radio">
+
+            <form role="form" class="form-signin" action="/oauth/authorize" method="post">
+
+                <h3>The following application requests access to your files:</h3>
+                <div>{{ application_title }}</div>
+                <div>{{ application_descr }}</div>
+                <div class="form-group">
+                    <label for="exampleInputEmail1">Email address</label>
+                    <input type="email" class="form-control" id="email" placeholder="Enter email" required autofocus>
+                </div>
+                <div class="form-group">
+                    <label for="exampleInputPassword1">Password</label>
+                    <input type="password" class="form-control" id="password" placeholder="Password" required>
+                </div>
+                <div class="form-group">
+                    <div class="radio">
+                        <label>
+                            <input type="radio" name="permission" id="allow" value="allow" checked>
+                            Allow access to this app
+                        </label>
+                    </div>
+                    <div class="radio">
+                        <label>
+                            <input type="radio" name="permission" id="deny" value="deny">
+                            Deny access to this app
+                        </label>
+                    </div>
+                </div>
+                <div class="checkbox">
                     <label>
-                        <input type="radio" name="permission" id="allow" value="allow" checked>
-                        Allow access to this app
+                        <input type="checkbox"> Check me out
                     </label>
                 </div>
-                <div class="radio">
-                    <label>
-                        <input type="radio" name="permission" id="deny" value="deny">
-                        Deny access to this app
-                    </label>
-                </div>
-            </div>
-            <div class="checkbox">
-                <label>
-                    <input type="checkbox"> Check me out
-                </label>
-            </div>
-            <button type="submit" class="btn btn-default">Submit</button>
-        </form>
+                <button type="submit" class="btn btn-lg btn-primary btn-block">Submit</button>
+            </form>
+
+        </div> <!-- /container -->
 
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
         <script src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
