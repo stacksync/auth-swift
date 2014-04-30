@@ -1,4 +1,5 @@
 import os
+import random
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from stacksync_oauth.provider import AuthProvider
@@ -46,7 +47,7 @@ class StackSyncAuth(object):
 
         self.logger.info('StackSync Auth: __call__: %r', environ)
 
-        if environ.get('HTTP_STACKSYNC_API'):
+        if environ.get('HTTP_STACKSYNC_API') or environ.get('PATH_INFO') == '/oauth/authorize':
             self.logger.info('StackSync Auth: __call__: STACKSYNC-API ON')
             # Handle anonymous access to accounts I'm the definitive
             # auth for.
@@ -86,6 +87,13 @@ class StackSyncAuth(object):
 
     def __authorize(self, req):
         self.logger.info('StackSync Auth: authorize: authorize request')
+        headers = {}
+        if 'Cookie' not in req.headers:
+            self.logger.info('StackSync Auth: Cookie not found. Creating one...')
+            session_id = '%032x' % random.getrandbits(128)
+            headers['Set-Cookie'] = 'ssid=%s' % session_id
+        else:
+            headers['Cookie'] = req.headers['Cookie']
 
         if req.method == 'GET':
             template_file = "authorize.jinja"
@@ -94,7 +102,7 @@ class StackSyncAuth(object):
                              "application_descr": "Descripcion de la app.... bla bla bla..."}
 
             body = template.render(template_vars)
-            return HTTPOk(body=body)
+            return HTTPOk(body=body, headers=headers)
 
         elif req.method == 'POST':
             b = 'Authorize page'
