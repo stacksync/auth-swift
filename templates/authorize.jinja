@@ -5,6 +5,7 @@
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+        <link href="style.css" rel="stylesheet">
         <!--[if lt IE 9]>
         <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
         <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
@@ -13,43 +14,38 @@
     </head>
     <body>
         <div class="container">
+            <h3>The following application requests access to your files:</h3>
+            <div>{{ application_title }}</div>
+            <div>{{ application_descr }}</div>
 
-
-            <form role="form" class="form-signin" action="/oauth/authorize" method="post">
-
-                <h3>The following application requests access to your files:</h3>
-                <div>{{ application_title }}</div>
-                <div>{{ application_descr }}</div>
-                <div class="form-group">
-                    <label for="exampleInputEmail1">Email address</label>
-                    <input type="email" class="form-control" id="email" placeholder="Enter email" required autofocus>
+            <div class="row">
+                <div class="col-md-4">
+                    <img src="http://stacksync.org/wp-content/uploads/2014/03/stacksync-logo-small_letters-transparent-inverted-small.png" class="img-responsive" alt="StackSync">
                 </div>
-                <div class="form-group">
-                    <label for="exampleInputPassword1">Password</label>
-                    <input type="password" class="form-control" id="password" placeholder="Password" required>
+                <div class="col-md-4">
+                    <form role="form" class="form-signin" action="/oauth/authorize" method="post">
+                        <div class="form-group">
+                            <input type="email" class="form-control" placeholder="Email address" required autofocus>
+                            <input type="password" class="form-control" placeholder="Password" required>
+                        </div>
+                        <div class="form-group">
+                            <div class="radio">
+                                <label>
+                                    <input type="radio" name="permission" id="allow" value="allow" checked>
+                                    Allow access to this app
+                                </label>
+                            </div>
+                            <div class="radio">
+                                <label>
+                                    <input type="radio" name="permission" id="deny" value="deny">
+                                    Deny access to this app
+                                </label>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-lg btn-primary btn-block">Submit</button>
+                    </form>
                 </div>
-                <div class="form-group">
-                    <div class="radio">
-                        <label>
-                            <input type="radio" name="permission" id="allow" value="allow" checked>
-                            Allow access to this app
-                        </label>
-                    </div>
-                    <div class="radio">
-                        <label>
-                            <input type="radio" name="permission" id="deny" value="deny">
-                            Deny access to this app
-                        </label>
-                    </div>
-                </div>
-                <div class="checkbox">
-                    <label>
-                        <input type="checkbox"> Check me out
-                    </label>
-                </div>
-                <button type="submit" class="btn btn-lg btn-primary btn-block">Submit</button>
-            </form>
-
+            </div>
         </div> <!-- /container -->
 
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
