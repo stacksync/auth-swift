@@ -11,6 +11,7 @@ from swift.common.middleware.acl import clean_acl
 from swift.common.swob import HTTPForbidden, HTTPUnauthorized, HTTPBadRequest, HTTPOk, Response, HTTPMethodNotAllowed, \
     HTTPInternalServerError
 from swift.common.utils import get_logger
+from oauthlib.common import urlencode, urldecode
 import jinja2
 
 
@@ -114,12 +115,11 @@ class StackSyncAuth(object):
         request_token, consumer = result
 
         if req.method == 'GET':
-
             template_file = "authorize.jinja"
             template = self.template_env.get_template(template_file)
             template_vars = {"application_title": consumer.application_title,
                              "application_descr": consumer.application_description,
-                             "oauth_token": request_token}
+                             "oauth_token": request_token.request_token}
 
             body = template.render(template_vars)
             return HTTPOk(body=body, headers=headers)
@@ -127,10 +127,10 @@ class StackSyncAuth(object):
         elif req.method == 'POST':
 
             try:
-                self.logger.info('StackSync Auth: requests params: %r' % (req.params, ))
-                request_token, email, password, permission = self.__get_authorize_params(req)
+                self.logger.info('StackSync Auth: body: %s ' % (req.body, ))
+                email, password, permission = self.__get_authorize_params(req)
 
-                result = self.provider.verify_authorize_submission(request_token, email)
+                result = self.provider.verify_authorize_submission(request_token.request_token, email)
 
                 if not result:
                     self.logger.info('StackSync Auth: request token or email not found')
@@ -158,7 +158,7 @@ class StackSyncAuth(object):
                     return HTTPUnauthorized('Authorization rejected by user')
 
                 self.logger.info('StackSync Auth: user granted authorization')
-                verifier = self.provider.authorize_request_token(request_token, user.id)
+                verifier = self.provider.authorize_request_token(request_token.request_token, user.id)
 
                 if not verifier:
                     self.logger.info('StackSync Auth: could not create verifier')
@@ -183,16 +183,17 @@ class StackSyncAuth(object):
             return HTTPMethodNotAllowed()
 
     def __get_authorize_params(self, req):
-        if 'oauth_token' not in req.params:
-            raise AttributeError('oauth_token not found')
-        if 'email' not in req.params:
+        form_params_list = urldecode(req.body)
+        form_params = dict(form_params_list)
+
+        if 'email' not in form_params:
             raise AttributeError('email not found')
-        if 'password' not in req.params:
+        if 'password' not in form_params:
             raise AttributeError('password not found')
-        if 'permission' not in req.params:
+        if 'permission' not in form_params:
             raise AttributeError('permission not found')
 
-        return req.params['oauth_token'], req.params['email'], req.params['password'], req.params['permission']
+        return form_params['email'], form_params['password'], form_params['permission']
 
     def __login_keystone_v2(self, username, password):
         headers = {'Content-Type': 'application/json'}
