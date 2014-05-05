@@ -1,17 +1,20 @@
+import json
 import os
 import random
+import urllib
+import requests
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from stacksync_oauth.provider import AuthProvider
 from stacksync_oauth.validator import AuthValidator
 from swift.common.middleware.acl import clean_acl
-from swift.common.swob import HTTPForbidden, HTTPUnauthorized, HTTPBadRequest, HTTPOk, Response, HTTPMethodNotAllowed
+from swift.common.swob import HTTPForbidden, HTTPUnauthorized, HTTPBadRequest, HTTPOk, Response, HTTPMethodNotAllowed, \
+    HTTPInternalServerError
 from swift.common.utils import get_logger
 import jinja2
 
 
 class StackSyncAuth(object):
-
     def __init__(self, app, conf):
         self.app = app
         self.host = conf.get('psql_host', 'localhost').lower()
@@ -20,6 +23,9 @@ class StackSyncAuth(object):
         self.user = conf.get('psql_user', 'postgres')
         self.password = conf.get('psql_password', 'postgres')
         self.logger = get_logger(conf, log_route='stacksync_auth')
+        self.keystone_host = conf.get('keystone_host', 'localhost').lower()
+        self.keystone_port = conf.get('keystone_port', 5000)
+        self.keystone_version = conf.get('keystone_version', '2.0')
         self.templates_path = conf.get('templates_path', '')
 
         if not os.path.isdir(self.templates_path):
@@ -112,17 +118,100 @@ class StackSyncAuth(object):
             template_file = "authorize.jinja"
             template = self.template_env.get_template(template_file)
             template_vars = {"application_title": consumer.application_title,
-                             "application_descr": consumer.application_description, 
-                             "oauth_token" : request_token}
+                             "application_descr": consumer.application_description,
+                             "oauth_token": request_token}
 
             body = template.render(template_vars)
             return HTTPOk(body=body, headers=headers)
 
         elif req.method == 'POST':
-            b = 'Authorize page'
-            return HTTPOk(body=b)
+
+            try:
+                self.logger.info('StackSync Auth: requests params: %r' % (req.params, ))
+                request_token, email, password, permission = self.__get_authorize_params(req)
+
+                result = self.provider.verify_authorize_submission(request_token, email)
+
+                if not result:
+                    self.logger.info('StackSync Auth: request token or email not found')
+                    return HTTPBadRequest(body='Invalid parameters')
+
+                user, token, consumer = result
+                self.logger.info('StackSync Auth: request token and email successfully verified')
+
+                if self.keystone_version == '2' or '2.0':
+                    logged_in = self.__login_keystone_v2(user.swift_user, password)
+                elif self.keystone_version == '3':
+                    logged_in = self.__login_keystone_v3(user.swift_user, password)
+                else:
+                    return HTTPInternalServerError('Keystone version %s not implemented' % self.keystone_version)
+
+                if not logged_in:
+                    self.logger.info('StackSync Auth: login failed')
+                    return HTTPUnauthorized('User credentials not validated')
+
+                self.logger.info('StackSync Auth: successfully logged in')
+
+                if permission != 'allow':
+                    #TODO: inform the consumer about the rejection
+                    self.logger.info('StackSync Auth: user rejected authorization')
+                    return HTTPUnauthorized('Authorization rejected by user')
+
+                self.logger.info('StackSync Auth: user granted authorization')
+                verifier = self.provider.authorize_request_token(request_token, user.id)
+
+                if not verifier:
+                    self.logger.info('StackSync Auth: could not create verifier')
+                    return HTTPUnauthorized('Invalid request token')
+
+                self.logger.info('StackSync Auth: verifier created successfully')
+
+                if request_token.redirect_uri == 'oob':
+                    body = 'Request token: %s<br />Verifier: %s' % (request_token.request_token.encode('utf8'), verifier.encode('utf8'))
+                    return HTTPOk(body)
+                else:
+                    url_params = {'verifier': verifier, 'token': request_token.request_token}
+                    encoded_params = urllib.urlencode(url_params)
+                    redirect_url = request_token.redirect_uri + "?" + encoded_params
+                    #TODO: redirect to URL instead of returning HTTPOk
+                    return HTTPOk(redirect_url.encode('utf8'))
+
+            except AttributeError as inst:
+                self.logger.info('StackSync Auth: authorization failure: %s' % inst)
+                return HTTPBadRequest(body=inst)
         else:
             return HTTPMethodNotAllowed()
+
+    def __get_authorize_params(self, req):
+        if 'oauth_token' not in req.params:
+            raise AttributeError('oauth_token not found')
+        if 'email' not in req.params:
+            raise AttributeError('email not found')
+        if 'password' not in req.params:
+            raise AttributeError('password not found')
+        if 'permission' not in req.params:
+            raise AttributeError('permission not found')
+
+        return req.params['oauth_token'], req.params['email'], req.params['password'], req.params['permission']
+
+    def __login_keystone_v2(self, username, password):
+        headers = {'Content-Type': 'application/json'}
+        body = {"auth": {"passwordCredentials": {"username": "%s" % username, "password": "%s" % password},
+                         "tenantName": "service"}}
+        json_body = json.dumps(body)
+        url = 'http://%s:%s/v2.0/tokens' % (self.keystone_host, self.keystone_port)
+        r = requests.post(url, json_body, headers=headers)
+        return 200 <= r.status_code < 300
+
+    def __login_keystone_v3(self, username, password):
+        headers = {'Content-Type': 'application/json'}
+        body = {"auth": {"identity": {"methods": ["password"], "password": {
+            "user": {"name": "%s" % username, "password": "%s" % password, "domain": {"id": "default"}}}},
+                         "scope": {"project": {"domain": {"id": "default"}, "name": "service"}}}}
+        json_body = json.dumps(body)
+        url = 'http://%s:%s/v3/auth/tokens' % (self.keystone_host, self.keystone_port)
+        r = requests.post(url, json_body, headers=headers)
+        return 200 <= r.status_code < 300
 
     def __protected_resource(self, req):
         self.logger.info('StackSync Auth: authorize: protected resource request')
