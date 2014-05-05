@@ -95,11 +95,25 @@ class StackSyncAuth(object):
         else:
             headers['Cookie'] = req.headers['Cookie']
 
+        self.logger.info('StackSync Auth: authorize: params: %r' % req.params)
+
+        if 'oauth_token' not in req.params:
+            return HTTPBadRequest(body='Missing oauth token')
+
+        token = req.params['oauth_token']
+        result = self.provider.verify_authorize_request(token)
+        if not result:
+            return HTTPBadRequest(body='Invalid oauth token')
+
+        request_token, consumer = result
+
         if req.method == 'GET':
+
             template_file = "authorize.jinja"
             template = self.template_env.get_template(template_file)
-            template_vars = {"application_title": "Titulo de la app",
-                             "application_descr": "Descripcion de la app.... bla bla bla..."}
+            template_vars = {"application_title": consumer.application_title,
+                             "application_descr": consumer.application_description, 
+                             "oauth_token" : request_token}
 
             body = template.render(template_vars)
             return HTTPOk(body=body, headers=headers)
