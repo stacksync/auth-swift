@@ -88,7 +88,7 @@ class StackSyncAuth(object):
     def __access_token(self, req):
         self.logger.info('StackSync Auth: authorize: access token request')
         h, b, s = self.provider.create_access_token_response(req.url, http_method=req.method, body=req.body,
-                                                              headers=req.headers)
+                                                             headers=req.headers)
         return Response(body=b, status=s, headers=h)
 
     def __authorize(self, req):
@@ -166,7 +166,8 @@ class StackSyncAuth(object):
                 self.logger.info('StackSync Auth: verifier created successfully')
 
                 if request_token.redirect_uri == 'oob':
-                    body = 'Request token: %s<br />Verifier: %s' % (request_token.request_token.encode('utf8'), verifier.encode('utf8'))
+                    body = 'Request token: %s<br />Verifier: %s' % (
+                        request_token.request_token.encode('utf8'), verifier.encode('utf8'))
                     return HTTPOk(body)
                 else:
                     url_params = {'verifier': verifier, 'token': request_token.request_token}
@@ -215,22 +216,16 @@ class StackSyncAuth(object):
 
     def __protected_resource(self, req):
         self.logger.info('StackSync Auth: authorize: protected resource request')
-        valid, _ = self.provider.validate_protected_resource_request(req.url, http_method=req.method, body=req.body,
-                                                                     headers=req.headers)
+        valid, oauth_info = self.provider.validate_protected_resource_request(req.url, http_method=req.method,
+                                                                              body=req.body,
+                                                                              headers=req.headers)
         if valid:
+            req.environ['stacksync_user_id'] = oauth_info.user.id
+            req.environ['stacksync_user_account'] = oauth_info.user.swift_account
+            self.logger.info('StackSync Auth: authorize: Valid request')
             return None
-        return HTTPUnauthorized()
-
-    def denied_response(self, req):
-        """Deny WSGI Response.
-
-        Returns a standard WSGI response callable with the status of 403 or 401
-        depending on whether the REMOTE_USER is set or not.
-        """
-        if req.remote_user:
-            return HTTPForbidden(request=req)
-        else:
-            return HTTPUnauthorized(request=req)
+        self.logger.info('StackSync Auth: authorize: Invalid request')
+        return HTTPUnauthorized('Could not authorize request')
 
 
 def filter_factory(global_conf, **local_conf):
