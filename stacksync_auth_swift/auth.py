@@ -87,9 +87,8 @@ class StackSyncAuth(object):
 
     def __access_token(self, req):
         self.logger.info('StackSync Auth: authorize: access token request')
-        credentials = {'user_id': '1'}
-        h, b, s = self.provider.create_request_token_response(req.url, http_method=req.method, body=req.body,
-                                                              headers=req.headers, credentials=credentials)
+        h, b, s = self.provider.create_access_token_response(req.url, http_method=req.method, body=req.body,
+                                                              headers=req.headers)
         return Response(body=b, status=s, headers=h)
 
     def __authorize(self, req):
