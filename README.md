@@ -21,7 +21,13 @@ Now, you have to install the psycopg2 Python package.
 SQLAlchemy is used to map Python objects to the database.
 
     easy_install sqlalchemy
-    
+
+#### Jinja2
+
+Jinja2 is used to render the OAuth's authorization page so that the user can grant or deny permissions to applications.
+
+    easy_install Jinja2
+
 #### StackSync OAuth Python library
 
 Please, refer to the [StackSync Auth project](https://github.com/stacksync/auth) to install it.
@@ -43,6 +49,11 @@ Now we need to modify the proxy configuration. First, we add the filter to tell 
     psql_dbname = stacksync
     psql_user = stacksync_user
     psql_password = stacksync
+    tenant = stacksync
+    keystone_host = localhost
+    keystone_post = 5000
+    keystone_version = 2.0
+    templates_path = /home/swift/stacksync-auth-swift/templates/
 
 Next, we have to add the middleware to the proxy's pipeline.
 

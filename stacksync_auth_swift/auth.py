@@ -2,16 +2,17 @@ import json
 import os
 import random
 import urllib
-import requests
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
 from stacksync_oauth.provider import AuthProvider
 from stacksync_oauth.validator import AuthValidator
 from swift.common.middleware.acl import clean_acl
-from swift.common.swob import HTTPForbidden, HTTPUnauthorized, HTTPBadRequest, HTTPOk, Response, HTTPMethodNotAllowed, \
-    HTTPInternalServerError
+from swift.common.swob import HTTPUnauthorized, HTTPBadRequest, HTTPOk, Response, HTTPMethodNotAllowed, \
+    HTTPInternalServerError, HTTPMovedPermanently
 from swift.common.utils import get_logger
-from oauthlib.common import urlencode, urldecode
+from oauthlib.common import urldecode
+from keystoneclient.v2_0 import client as client_v2
+from keystoneclient.v3 import client as client_v3
 import jinja2
 
 
@@ -23,11 +24,12 @@ class StackSyncAuth(object):
         self.dbname = conf.get('psql_dbname', 'stacksync')
         self.user = conf.get('psql_user', 'postgres')
         self.password = conf.get('psql_password', 'postgres')
-        self.logger = get_logger(conf, log_route='stacksync_auth')
+        self.tenant = conf.get('tenant', 'stacksync')
         self.keystone_host = conf.get('keystone_host', 'localhost').lower()
         self.keystone_port = conf.get('keystone_port', 5000)
         self.keystone_version = conf.get('keystone_version', '2.0')
         self.templates_path = conf.get('templates_path', '')
+        self.logger = get_logger(conf, log_route='stacksync_auth')
 
         if not os.path.isdir(self.templates_path):
             raise Exception('Templates path does not exists')
@@ -114,13 +116,8 @@ class StackSyncAuth(object):
         request_token, consumer = result
 
         if req.method == 'GET':
-            template_file = "authorize.jinja"
-            template = self.template_env.get_template(template_file)
-            template_vars = {"application_title": consumer.application_title,
-                             "application_descr": consumer.application_description,
-                             "oauth_token": request_token.request_token}
-
-            body = template.render(template_vars)
+            body = self.__render_authorize_page(consumer.application_title, consumer.application_description,
+                                                request_token.request_token)
             return HTTPOk(body=body, headers=headers)
 
         elif req.method == 'POST':
@@ -133,7 +130,9 @@ class StackSyncAuth(object):
 
                 if not result:
                     self.logger.info('StackSync Auth: request token or email not found')
-                    return HTTPBadRequest(body='Invalid parameters')
+                    body = self.__render_authorize_page(consumer.application_title, consumer.application_description,
+                                                        request_token.request_token, error='Invalid parameters')
+                    return HTTPOk(body=body, headers=headers)
 
                 user, token, consumer = result
                 self.logger.info('StackSync Auth: request token and email successfully verified')
@@ -147,21 +146,26 @@ class StackSyncAuth(object):
 
                 if not logged_in:
                     self.logger.info('StackSync Auth: login failed')
-                    return HTTPUnauthorized('User credentials not validated')
+                    body = self.__render_authorize_page(consumer.application_title, consumer.application_description,
+                                                        request_token.request_token, error='Invalid user or password')
+                    return HTTPOk(body=body, headers=headers)
 
                 self.logger.info('StackSync Auth: successfully logged in')
 
                 if permission != 'allow':
                     #TODO: inform the consumer about the rejection
                     self.logger.info('StackSync Auth: user rejected authorization')
-                    return HTTPUnauthorized('Authorization rejected by user')
+                    return HTTPOk('Authorization rejected by user')
 
                 self.logger.info('StackSync Auth: user granted authorization')
                 verifier = self.provider.authorize_request_token(request_token.request_token, user.id)
 
                 if not verifier:
                     self.logger.info('StackSync Auth: could not create verifier')
-                    return HTTPUnauthorized('Invalid request token')
+                    body = self.__render_authorize_page(consumer.application_title, consumer.application_description,
+                                                        request_token.request_token,
+                                                        error='Could not generate verifier, please contact an administrator')
+                    return HTTPOk(body=body, headers=headers)
 
                 self.logger.info('StackSync Auth: verifier created successfully')
 
@@ -173,14 +177,24 @@ class StackSyncAuth(object):
                     url_params = {'verifier': verifier, 'token': request_token.request_token}
                     encoded_params = urllib.urlencode(url_params)
                     redirect_url = request_token.redirect_uri + "?" + encoded_params
-                    #TODO: redirect to URL instead of returning HTTPOk
-                    return HTTPOk(redirect_url.encode('utf8'))
+                    headers = {'Location': redirect_url}
+                    return HTTPMovedPermanently(headers=headers)
 
             except AttributeError as inst:
                 self.logger.info('StackSync Auth: authorization failure: %s' % inst)
                 return HTTPBadRequest(body=inst)
         else:
             return HTTPMethodNotAllowed()
+
+    def __render_authorize_page(self, app_title, app_description, oauth_token, error=None):
+        template_file = "authorize.jinja"
+        template = self.template_env.get_template(template_file)
+        template_vars = {"application_title": app_title,
+                         "application_descr": app_description,
+                         "oauth_token": oauth_token,
+                         "error": error}
+        body = template.render(template_vars)
+        return body
 
     def __get_authorize_params(self, req):
         form_params_list = urldecode(req.body)
@@ -196,23 +210,20 @@ class StackSyncAuth(object):
         return form_params['email'], form_params['password'], form_params['permission']
 
     def __login_keystone_v2(self, username, password):
-        headers = {'Content-Type': 'application/json'}
-        body = {"auth": {"passwordCredentials": {"username": "%s" % username, "password": "%s" % password},
-                         "tenantName": "service"}}
-        json_body = json.dumps(body)
-        url = 'http://%s:%s/v2.0/tokens' % (self.keystone_host, self.keystone_port)
-        r = requests.post(url, json_body, headers=headers)
-        return 200 <= r.status_code < 300
+        try:
+            url = 'http://%s:%s/v2.0' % (self.keystone_host, self.keystone_port)
+            client_v2.Client(username=username, password=password, tenant_name=self.tenant, auth_url=url)
+            return True
+        except:
+            return False
 
     def __login_keystone_v3(self, username, password):
-        headers = {'Content-Type': 'application/json'}
-        body = {"auth": {"identity": {"methods": ["password"], "password": {
-            "user": {"name": "%s" % username, "password": "%s" % password, "domain": {"id": "default"}}}},
-                         "scope": {"project": {"domain": {"id": "default"}, "name": "service"}}}}
-        json_body = json.dumps(body)
-        url = 'http://%s:%s/v3/auth/tokens' % (self.keystone_host, self.keystone_port)
-        r = requests.post(url, json_body, headers=headers)
-        return 200 <= r.status_code < 300
+        try:
+            url = 'http://%s:%s/v3' % (self.keystone_host, self.keystone_port)
+            client_v3.Client(username=username, password=password, tenant_name=self.tenant, auth_url=url)
+            return True
+        except:
+            return False
 
     def __protected_resource(self, req):
         self.logger.info('StackSync Auth: authorize: protected resource request')
