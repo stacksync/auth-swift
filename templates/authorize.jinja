@@ -5,6 +5,7 @@
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css">
+        <link rel="stylesheet" href="http://getbootstrap.com/assets/css/docs.min.css">
         <!--[if lt IE 9]>
         <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
         <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
@@ -12,20 +13,31 @@
         <title>StackSync</title>
     </head>
     <body>
-        <div class="container" style="width: 768px;">
-            <h1>StackSync</h1>
-            <hr />
-            <h3>The following application requests access to your files:</h3>
-            <h4>{{ application_title }}</h4>
-            <div>{{ application_descr }}</div>
-            <hr />
+        <div class="container">
             <div class="row">
-                <div class="col-md-1"></div>
-                <div class="col-md-4">
-                    <img src="http://stacksync.org/wp-content/uploads/2014/03/stacksync-logo-noletters-transparent-square.png" style="max-width:230px;"  alt="StackSync">
+                <div class="col-md-8">
+                    <h1>StackSync</h1>
+                    <hr />
+                    <h3>The following application requests access to your files:</h3>
+                    <h4>{{ application_title }}</h4>
+                    <div>{{ application_descr }}</div>
+                    <hr />
                 </div>
-                <div class="col-md-1"></div>
-                <div class="col-md-6">
+            </div>
+            {% if error %}
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="bs-callout bs-callout-danger">
+                        <p>{{ error }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            <div class="row">
+                <div class="col-md-4">
+                    <img src="http://stacksync.org/wp-content/uploads/2014/03/stacksync-logo-noletters-transparent-square.png" style="max-width:200px;"  alt="StackSync">
+                </div>
+                <div class="col-md-4">
                     <form role="form" class="form-signin" action="/oauth/authorize?oauth_token={{ oauth_token }}" method="post">
                         <div class="form-group">
                             <input name="email" type="email" class="form-control" placeholder="Email address" required autofocus>

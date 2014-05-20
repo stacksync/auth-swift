@@ -131,7 +131,7 @@ class StackSyncAuth(object):
                 if not result:
                     self.logger.info('StackSync Auth: request token or email not found')
                     body = self.__render_authorize_page(consumer.application_title, consumer.application_description,
-                                                        request_token.request_token, error='Invalid parameters')
+                                                        request_token.request_token, error='Invalid user or password')
                     return HTTPOk(body=body, headers=headers)
 
                 user, token, consumer = result
