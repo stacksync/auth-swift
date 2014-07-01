@@ -40,6 +40,10 @@ To install the StackSync authentication middleware for Swift you first need to i
 
 This will install the package after checking that the previous requirements are satisfied.
 
+Depending on your Python installation you may also need to update other Python packages.
+
+    pip install -U
+
 Now we need to modify the proxy configuration. First, we add the filter to tell the proxy that the middleware should be loaded. Be sure you set up the database with the correct parameters.
 
     [filter:stacksync-auth-swift]
