@@ -1,4 +1,3 @@
-import json
 import os
 import random
 import urllib
@@ -169,13 +168,13 @@ class StackSyncAuth(object):
 
                 self.logger.info('StackSync Auth: verifier created successfully')
 
+                url_params = {'token': request_token.request_token, 'verifier': verifier}
+                encoded_params = urllib.urlencode(url_params)
+
                 if request_token.redirect_uri == 'oob':
-                    body = 'Request token: %s<br />Verifier: %s' % (
-                        request_token.request_token.encode('utf8'), verifier.encode('utf8'))
-                    return HTTPOk(body)
+                    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+                    return HTTPOk(encoded_params, headers=headers)
                 else:
-                    url_params = {'verifier': verifier, 'token': request_token.request_token}
-                    encoded_params = urllib.urlencode(url_params)
                     redirect_url = request_token.redirect_uri + "?" + encoded_params
                     headers = {'Location': redirect_url}
                     return HTTPMovedPermanently(headers=headers)
